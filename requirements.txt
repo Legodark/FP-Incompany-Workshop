@@ -1,0 +1,7 @@
+streamlit==1.41.1
+openai==1.58.1
+pinecone-client==5.0.1
+PyPDF2==3.0.1
+PyMuPDF==1.25.1
+requests==2.32.3
+tiktoken==0.8.0
