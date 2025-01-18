@@ -5,6 +5,7 @@ from services.openai_service import OpenAIService
 from components.document_list import render_document_list
 from components.chat_interface import render_chat_interface
 from utils.session_state import init_session_state
+from components.chat_interface import render_chat_interface
 
 # Configuración inicial de la página
 st.set_page_config(layout="wide", page_title="PDF Chatbot")

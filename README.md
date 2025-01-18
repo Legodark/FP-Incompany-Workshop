@@ -62,6 +62,7 @@ chatbot-streamlit
    PINECONE_API_KEY = "your_pinecone_api_key"
    PINECONE_ENVIRONMENT = "your_pinecone_environment"
    PINECONE_HOST = "your_pinecone_host"
+   EMBED_MODEL = "your_vectorizer_model_name"
    ```
 
 ## Uso

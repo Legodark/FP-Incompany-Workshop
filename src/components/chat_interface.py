@@ -1,4 +1,5 @@
 import streamlit as st
+from utils.token_counter import count_tokens, count_messages_tokens
 
 def render_chat_interface(documents, pinecone_service, openai_service):
     """Renderiza la interfaz principal del chat"""
@@ -78,27 +79,36 @@ def handle_rag_mode(user_input, doc_info, pinecone_service, openai_service):
         if query_response:
             context_chunks = []
             scores = []
+            total_chars = 0
+            total_tokens = 0
             
             for match in query_response.matches:
                 if hasattr(match, 'metadata') and 'chunk_text' in match.metadata:
-                    context_chunks.append(match.metadata['chunk_text'])
+                    chunk_text = match.metadata['chunk_text']
+                    context_chunks.append(chunk_text)
                     scores.append(match.score if hasattr(match, 'score') else 0)
+                    total_chars += len(chunk_text)
+                    total_tokens += count_tokens(chunk_text)
             
             # Debug info - Chunks encontrados
             if st.session_state.debug_mode:
                 st.write(f"✓ Encontrados {len(context_chunks)} chunks relevantes")
+                st.write(f"✓ Total caracteres en chunks: {total_chars}")
+                st.write(f"✓ Total tokens en chunks: {total_tokens}")
                 st.write("3. Chunks seleccionados con sus scores:")
                 for i, (chunk, score) in enumerate(zip(context_chunks, scores)):
                     with st.expander(f"Chunk {i+1} (Score: {score:.4f})"):
                         st.text(chunk)
+                        st.caption(f"Tokens en este chunk: {count_tokens(chunk)}")
 
             context = "\n".join(context_chunks)
-            
             messages = prepare_chat_messages(context)
 
             # Debug info - Preparación del prompt
             if st.session_state.debug_mode:
+                input_tokens = count_messages_tokens(messages)
                 st.write("4. Preparando prompt para GPT:")
+                st.write(f"✓ Total tokens en el prompt: {input_tokens}")
                 with st.expander("Ver prompt completo"):
                     st.write("Mensajes del sistema:")
                     for msg in messages[:2]:  # Los primeros dos mensajes son del sistema
@@ -117,7 +127,6 @@ def handle_no_rag_mode(user_input, doc_info, openai_service, pinecone_service):
     if not doc_content:
         doc_content = pinecone_service.get_full_document_text(st.session_state.active_doc)
         if doc_content:
-            # Guardar en session_state para futuros usos
             st.session_state.document_contents[st.session_state.active_doc] = doc_content
     
     # Debug info
@@ -125,6 +134,7 @@ def handle_no_rag_mode(user_input, doc_info, openai_service, pinecone_service):
         st.info("🔍 Debug Info:")
         st.write(f"- Documento activo: {st.session_state.active_doc}")
         st.write(f"- Longitud del contenido: {len(doc_content)} caracteres")
+        st.write(f"- Tokens en el documento: {count_tokens(doc_content)}")
         if len(doc_content) == 0:
             st.error("⚠️ Error: No se encontró contenido para el documento activo")
             return
@@ -134,7 +144,7 @@ def handle_no_rag_mode(user_input, doc_info, openai_service, pinecone_service):
         st.error("No se pudo recuperar el contenido del documento.")
         return
     
-    # Crear un prompt más específico que fuerce al modelo a usar el contenido
+    # Crear mensajes para el chat
     system_message = (
         "Eres un asistente experto que analiza y responde preguntas sobre documentos. "
         "A continuación se te proporcionará el contenido completo de un documento. "
@@ -167,9 +177,9 @@ Responde usando ÚNICAMENTE la información proporcionada en el documento anteri
     
     # Debug info
     if st.session_state.debug_mode:
-        st.write(f"- Número de mensajes: {len(messages)}")
-        st.write(f"- Longitud del content_message: {len(content_message)} caracteres")
-        st.write("- Primeros 500 caracteres del documento:")
+        input_tokens = count_messages_tokens(messages)
+        st.write(f"- Tokens en el prompt: {input_tokens}")
+        st.write(f"- Primeros 500 caracteres del documento:")
         st.code(doc_content[:500] + "...")
     
     generate_response(messages, openai_service)
@@ -201,6 +211,11 @@ def generate_response(messages, openai_service):
             assistant_response = openai_service.get_chat_completion(messages)
             if assistant_response:
                 st.write(assistant_response)
+                # Debug info - Tokens en la respuesta
+                if st.session_state.debug_mode:
+                    output_tokens = count_tokens(assistant_response)
+                    st.caption(f"Tokens en la respuesta: {output_tokens}")
+                
                 st.session_state.messages.append({
                     "role": "assistant", 
                     "content": assistant_response
